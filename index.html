@@ -1,0 +1,416 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Sistema</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            background: #000;
+            color: #0f0;
+            font-family: 'Courier New', monospace;
+            overflow: hidden;
+            height: 100vh;
+            display: flex;
+            flex-direction: column;
+        }
+
+        .terminal {
+            flex: 1;
+            padding: 20px;
+            overflow-y: auto;
+            background: #000;
+            position: relative;
+        }
+
+        .terminal::-webkit-scrollbar {
+            width: 10px;
+        }
+
+        .terminal::-webkit-scrollbar-track {
+            background: #111;
+        }
+
+        .terminal::-webkit-scrollbar-thumb {
+            background: #0f0;
+            border-radius: 5px;
+        }
+
+        .line {
+            margin: 5px 0;
+            font-size: 14px;
+            line-height: 1.5;
+        }
+
+        .prompt {
+            color: #0f0;
+            font-weight: bold;
+        }
+
+        .error {
+            color: #f00;
+        }
+
+        .warning {
+            color: #ff0;
+        }
+
+        .success {
+            color: #0f0;
+            font-weight: bold;
+        }
+
+        .info {
+            color: #00f;
+        }
+
+        .cursor {
+            display: inline-block;
+            width: 8px;
+            height: 16px;
+            background: #0f0;
+            animation: blink 1s infinite;
+            margin-left: 5px;
+        }
+
+        @keyframes blink {
+            0%, 50% { opacity: 1; }
+            51%, 100% { opacity: 0; }
+        }
+
+        .header {
+            background: #111;
+            padding: 10px 20px;
+            border-bottom: 2px solid #0f0;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+
+        .header-title {
+            font-size: 16px;
+            font-weight: bold;
+        }
+
+        .header-status {
+            font-size: 12px;
+            color: #0f0;
+        }
+
+        /* Efecto de matriz en el fondo */
+        .matrix-bg {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            z-index: -1;
+            opacity: 0.1;
+            pointer-events: none;
+        }
+
+        /* Botón de inicio */
+        .start-screen {
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+            align-items: center;
+            height: 100vh;
+            text-align: center;
+            padding: 20px;
+        }
+
+        .start-screen h1 {
+            font-size: 32px;
+            margin-bottom: 20px;
+            text-shadow: 0 0 10px #0f0;
+        }
+
+        .start-screen p {
+            font-size: 16px;
+            margin-bottom: 30px;
+            max-width: 500px;
+        }
+
+        .start-btn {
+            background: transparent;
+            border: 2px solid #0f0;
+            color: #0f0;
+            padding: 15px 40px;
+            font-size: 18px;
+            font-family: 'Courier New', monospace;
+            cursor: pointer;
+            transition: all 0.3s;
+        }
+
+        .start-btn:hover {
+            background: #0f0;
+            color: #000;
+            box-shadow: 0 0 20px #0f0;
+        }
+
+        /* Barra de progreso */
+        .progress-container {
+            margin: 10px 0;
+            background: #111;
+            height: 20px;
+            border: 1px solid #0f0;
+            position: relative;
+            overflow: hidden;
+        }
+
+        .progress-bar {
+            height: 100%;
+            background: #0f0;
+            width: 0%;
+            transition: width 0.3s;
+            position: relative;
+        }
+
+        .progress-text {
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            color: #fff;
+            font-size: 12px;
+            font-weight: bold;
+            mix-blend-mode: difference;
+        }
+
+        /* Responsive */
+        @media (max-width: 600px) {
+            .terminal {
+                padding: 10px;
+                font-size: 12px;
+            }
+
+            .start-screen h1 {
+                font-size: 24px;
+            }
+
+            .start-btn {
+                padding: 12px 30px;
+                font-size: 16px;
+            }
+        }
+    </style>
+</head>
+<body>
+    <!-- Pantalla de inicio -->
+    <div class="start-screen" id="startScreen">
+        <h1>⚠️ SISTEMA DE ACCESO</h1>
+        <p>Este sistema realizará un análisis de seguridad completo en tu dispositivo. Continúa bajo tu propio riesgo.</p>
+        <button class="start-btn" onclick="iniciarHack()">INICIAR ANÁLISIS</button>
+    </div>
+
+    <!-- Terminal (oculta al inicio) -->
+    <div id="terminalContainer" style="display: none; height: 100vh; display: flex; flex-direction: column;">
+        <div class="header">
+            <div class="header-title">SISTEMA DE ANÁLISIS v2.4.1</div>
+            <div class="header-status">● CONECTADO</div>
+        </div>
+        <div class="terminal" id="terminal"></div>
+    </div>
+
+    <!-- Fondo matriz -->
+    <canvas class="matrix-bg" id="matrixCanvas"></canvas>
+
+    <script>
+        // Variables globales
+        let lineCount = 0;
+
+        // Secuencia de comandos del "hack"
+        const secuencia = [
+            { texto: "$ Iniciando sistema...", delay: 500, clase: "prompt" },
+            { texto: "$ Conectando a servidores...", delay: 800, clase: "prompt" },
+            { texto: "✓ Conexión establecida", delay: 600, clase: "success" },
+            { texto: "$ Detectando dispositivo...", delay: 700, clase: "prompt" },
+            { texto: `✓ Dispositivo: ${navigator.platform}`, delay: 500, clase: "info" },
+            { texto: `✓ Navegador: ${navigator.userAgent.split(' ').slice(-2).join(' ')}`, delay: 500, clase: "info" },
+            { texto: "$ Escaneando aplicaciones instaladas...", delay: 1000, clase: "prompt" },
+            { texto: "✓ WhatsApp detectado", delay: 600, clase: "success" },
+            { texto: "✓ Telegram detectado", delay: 400, clase: "success" },
+            { texto: "✓ Instagram detectado", delay: 400, clase: "success" },
+            { texto: "$ Accediendo a base de datos...", delay: 1200, clase: "prompt" },
+            { texto: "⚠ Intentando bypass de seguridad...", delay: 1000, clase: "warning" },
+            { progreso: true, texto: "Descifrando encriptación", duracion: 3000 },
+            { texto: "✓ Acceso concedido", delay: 800, clase: "success" },
+            { texto: "$ Extrayendo datos de WhatsApp...", delay: 1000, clase: "prompt" },
+            { progreso: true, texto: "Descargando mensajes", duracion: 3000 },
+            { texto: `✓ ${Math.floor(Math.random() * 500 + 1000)} mensajes extraídos`, delay: 600, clase: "success" },
+            { progreso: true, texto: "Descargando fotos", duracion: 2500 },
+            { texto: `✓ ${Math.floor(Math.random() * 100 + 200)} fotos extraídas`, delay: 600, clase: "success" },
+            { progreso: true, texto: "Descargando videos", duracion: 2500 },
+            { texto: `✓ ${Math.floor(Math.random() * 50 + 80)} videos extraídos`, delay: 600, clase: "success" },
+            { texto: "$ Analizando contactos...", delay: 1000, clase: "prompt" },
+            { texto: `✓ ${Math.floor(Math.random() * 50 + 150)} contactos encontrados`, delay: 600, clase: "success" },
+            { texto: "$ Generando reporte final...", delay: 1500, clase: "prompt" },
+            { texto: "⚠ ADVERTENCIA: Vulnerabilidad crítica detectada", delay: 1200, clase: "error" },
+            { texto: "✗ ERROR: Acceso denegado por sistema de seguridad", delay: 1000, clase: "error" },
+            { texto: "$ Cerrando conexión...", delay: 1000, clase: "prompt" },
+            { texto: "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━", delay: 1000, clase: "" },
+            { texto: "", delay: 500, clase: "" },
+            { texto: "😂 ¡TROLEADO!", delay: 500, clase: "success", grande: true },
+            { texto: "", delay: 300, clase: "" },
+            { texto: "Todo fue una simulación 🤣", delay: 500, clase: "success" },
+            { texto: "No se extrajo ningún dato real", delay: 500, clase: "info" },
+            { texto: "Era solo una broma de tu amigo 😎", delay: 500, clase: "info" },
+            { texto: "", delay: 500, clase: "" },
+            { texto: "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━", delay: 500, clase: "" },
+        ];
+
+        function iniciarHack() {
+            document.getElementById('startScreen').style.display = 'none';
+            document.getElementById('terminalContainer').style.display = 'flex';
+            
+            // Iniciar efecto matriz
+            iniciarMatriz();
+            
+            // Iniciar secuencia
+            ejecutarSecuencia(0);
+        }
+
+        function ejecutarSecuencia(index) {
+            if (index >= secuencia.length) {
+                mostrarBotonReinicio();
+                return;
+            }
+
+            const comando = secuencia[index];
+
+            if (comando.progreso) {
+                mostrarProgreso(comando.texto, comando.duracion, () => {
+                    ejecutarSecuencia(index + 1);
+                });
+            } else {
+                setTimeout(() => {
+                    escribirLinea(comando.texto, comando.clase, comando.grande);
+                    ejecutarSecuencia(index + 1);
+                }, comando.delay);
+            }
+        }
+
+        function escribirLinea(texto, clase = "", grande = false) {
+            const terminal = document.getElementById('terminal');
+            const linea = document.createElement('div');
+            linea.className = `line ${clase}`;
+            if (grande) linea.style.fontSize = '24px';
+            
+            terminal.appendChild(linea);
+            
+            let i = 0;
+            const intervalo = setInterval(() => {
+                if (i < texto.length) {
+                    linea.textContent += texto[i];
+                    i++;
+                    terminal.scrollTop = terminal.scrollHeight;
+                } else {
+                    clearInterval(intervalo);
+                }
+            }, 30);
+        }
+
+        function mostrarProgreso(texto, duracion, callback) {
+            const terminal = document.getElementById('terminal');
+            
+            const container = document.createElement('div');
+            container.className = 'line';
+            container.innerHTML = `
+                <div style="margin-bottom: 5px;">${texto}...</div>
+                <div class="progress-container">
+                    <div class="progress-bar" id="progressBar${lineCount}"></div>
+                    <div class="progress-text" id="progressText${lineCount}">0%</div>
+                </div>
+            `;
+            terminal.appendChild(container);
+            
+            const progressBar = document.getElementById(`progressBar${lineCount}`);
+            const progressText = document.getElementById(`progressText${lineCount}`);
+            
+            lineCount++;
+            
+            let progreso = 0;
+            const pasos = 100;
+            const intervalo = duracion / pasos;
+            
+            const timer = setInterval(() => {
+                progreso += 1;
+                progressBar.style.width = progreso + '%';
+                progressText.textContent = progreso + '%';
+                
+                if (progreso >= 100) {
+                    clearInterval(timer);
+                    setTimeout(callback, 300);
+                }
+                
+                terminal.scrollTop = terminal.scrollHeight;
+            }, intervalo);
+        }
+
+        function mostrarBotonReinicio() {
+            const terminal = document.getElementById('terminal');
+            const linea = document.createElement('div');
+            linea.className = 'line';
+            linea.innerHTML = `
+                <button class="start-btn" style="margin-top: 20px;" onclick="location.reload()">
+                    🔄 REINICIAR BROMA
+                </button>
+            `;
+            terminal.appendChild(linea);
+            terminal.scrollTop = terminal.scrollHeight;
+        }
+
+        // Efecto Matrix en el fondo
+        function iniciarMatriz() {
+            const canvas = document.getElementById('matrixCanvas');
+            const ctx = canvas.getContext('2d');
+            
+            canvas.width = window.innerWidth;
+            canvas.height = window.innerHeight;
+            
+            const caracteres = '01アイウエオカキクケコサシスセソタチツテトナニヌネノハヒフヘホマミムメモヤユヨラリルレロワヲン';
+            const fontSize = 14;
+            const columnas = canvas.width / fontSize;
+            const gotas = [];
+            
+            for (let i = 0; i < columnas; i++) {
+                gotas[i] = Math.random() * canvas.height;
+            }
+            
+            function dibujar() {
+                ctx.fillStyle = 'rgba(0, 0, 0, 0.05)';
+                ctx.fillRect(0, 0, canvas.width, canvas.height);
+                
+                ctx.fillStyle = '#0f0';
+                ctx.font = fontSize + 'px monospace';
+                
+                for (let i = 0; i < gotas.length; i++) {
+                    const texto = caracteres.charAt(Math.floor(Math.random() * caracteres.length));
+                    ctx.fillText(texto, i * fontSize, gotas[i] * fontSize);
+                    
+                    if (gotas[i] * fontSize > canvas.height && Math.random() > 0.975) {
+                        gotas[i] = 0;
+                    }
+                    gotas[i]++;
+                }
+            }
+            
+            setInterval(dibujar, 50);
+        }
+
+        // Responsive canvas
+        window.addEventListener('resize', () => {
+            const canvas = document.getElementById('matrixCanvas');
+            canvas.width = window.innerWidth;
+            canvas.height = window.innerHeight;
+        });
+    </script>
+</body>
+</html>
